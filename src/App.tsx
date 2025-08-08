@@ -179,27 +179,33 @@ function App() {
     }
   };
   return (
-    <div style={{ 
-      display: 'flex', 
+    <div style={{
+      display: 'flex',
       flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-      minHeight: '100vh', 
+      minHeight: '100vh',
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       color: '#333',
-      padding: window.innerWidth < 768 ? '0.5rem' : '1rem',
-      gap: window.innerWidth < 768 ? '1rem' : '0'
+      padding: 0,
+      gap: window.innerWidth < 768 ? '0' : '0',
+      width: '100%',
+      boxSizing: 'border-box',
+      overflowX: 'hidden',
+      maxWidth: '100%'
     }}>
       {/* Left: Entry Form & Admin Panel */}
-      <div style={{ 
-        flex: window.innerWidth < 768 ? 'none' : 1, 
-        padding: window.innerWidth < 768 ? '1rem' : '1.5rem', 
+      <div style={{
+        flex: window.innerWidth < 768 ? 'none' : 1,
+        padding: window.innerWidth < 768 ? '0.5rem' : '1.5rem',
         background: '#ffffff',
         margin: window.innerWidth < 768 ? '0' : '0 0.5rem 0 0',
-        borderRadius: 12,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+        borderRadius: window.innerWidth < 768 ? 0 : 12,
+        boxShadow: window.innerWidth < 768 ? 'none' : '0 8px 32px rgba(0,0,0,0.1)',
         overflowY: 'auto',
-        minWidth: window.innerWidth < 768 ? 'auto' : '300px',
-        maxWidth: window.innerWidth < 768 ? 'none' : '500px'
+        minWidth: window.innerWidth < 768 ? '0' : '300px',
+        maxWidth: window.innerWidth < 768 ? '100%' : '500px',
+        width: window.innerWidth < 768 ? '100%' : 'auto',
+        boxSizing: 'border-box'
       }}>
         <h2 style={{ 
           color: '#2c3e50', 
@@ -438,17 +444,21 @@ function App() {
         </div>
       </div>
       {/* Right: Summary & Who brings what */}
-      <div style={{ 
-        flex: window.innerWidth < 768 ? 'none' : 1, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        padding: window.innerWidth < 768 ? '1rem' : '1.5rem',
+      <div style={{
+        flex: window.innerWidth < 768 ? 'none' : 1,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: window.innerWidth < 768 ? '0.5rem' : '1.5rem',
         margin: window.innerWidth < 768 ? '0' : '0 0 0 0.5rem',
         background: '#ffffff',
-        borderRadius: 12,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+        borderRadius: window.innerWidth < 768 ? 0 : 12,
+        boxShadow: window.innerWidth < 768 ? 'none' : '0 8px 32px rgba(0,0,0,0.1)',
         overflowY: 'auto',
-        minHeight: window.innerWidth < 768 ? '400px' : 'auto'
+        minHeight: window.innerWidth < 768 ? '300px' : 'auto',
+        minWidth: window.innerWidth < 768 ? '0' : '500px',
+        width: window.innerWidth < 768 ? '100%' : 'auto',
+        maxWidth: window.innerWidth < 768 ? '100%' : '100vw',
+        boxSizing: 'border-box'
       }}>
         <div style={{ flex: 1, marginBottom: '1rem' }}>
           <h2 style={{ 
