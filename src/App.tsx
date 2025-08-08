@@ -589,12 +589,14 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.map((e, i) => (
-                    <tr key={i} style={{ 
+                  {entries.slice().reverse().map((e, i) => {
+                    const originalIndex = entries.length - 1 - i; // Calculate original index
+                    return (
+                    <tr key={originalIndex} style={{ 
                       background: i % 2 === 0 ? '#ffffff' : '#f1f3f4',
                       borderBottom: '1px solid #e9ecef'
                     }}>
-                      {editIdx === i ? (
+                      {editIdx === originalIndex ? (
                         <>
                           <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
                             <input value={editEntry?.name || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, name: ev.target.value } : null)} style={{ width: '100%' }} />
@@ -612,7 +614,7 @@ function App() {
                           </td>
                           {adminMode && (
                             <td colSpan={2} style={{ padding: 4, textAlign: 'right' }}>
-                              <button onClick={() => handleEditSave(i)} style={{ marginRight: 8, background: '#27ae60', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Save</button>
+                              <button onClick={() => handleEditSave(originalIndex)} style={{ marginRight: 8, background: '#27ae60', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Save</button>
                               <button onClick={handleEditCancel} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Cancel</button>
                             </td>
                           )}
@@ -646,14 +648,15 @@ function App() {
                           }}>{e.quantity}</td>
                           {adminMode && (
                             <td style={{ padding: 4, textAlign: 'right' }}>
-                              <button onClick={() => handleEditStart(i)} style={{ marginRight: 8, background: '#2980b9', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Edit</button>
-                              <button onClick={() => handleDelete(i)} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Delete</button>
+                              <button onClick={() => handleEditStart(originalIndex)} style={{ marginRight: 8, background: '#2980b9', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Edit</button>
+                              <button onClick={() => handleDelete(originalIndex)} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Delete</button>
                             </td>
                           )}
                         </>
                       )}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
