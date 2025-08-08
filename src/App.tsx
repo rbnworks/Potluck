@@ -659,7 +659,7 @@ function App() {
                       }}>
                         <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '500' }}>{baseName}</td>
                         <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '500', textAlign: 'center' }}>{CATEGORY_PER_QTY[i]}</td>
-                        <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', textAlign: 'right', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '600' }}>{total}</td>
+                        <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', textAlign: 'right', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '600' }}>{`${total} / ${maxQtyNums[i]}`}</td>
                       </tr>
                     );
                   })}
