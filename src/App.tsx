@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import './App.css';
 
 // Split into two lists: base names and per-qty notes
-const CATEGORY_NAMES = [
+// Defaults
+const DEFAULT_CATEGORY_NAMES = [
   'Starters',
   'Salads',
   'Veg curry',
@@ -12,7 +13,7 @@ const CATEGORY_NAMES = [
   'Sweets',
   'Drinks'
 ];
-const CATEGORY_PER_QTY = [
+const DEFAULT_CATEGORY_PER_QTY = [
   'Serving 5',
   'Serving 5',
   'Serving 4',
@@ -22,8 +23,7 @@ const CATEGORY_PER_QTY = [
   'Serving 8',
   'Serving 40'
 ];
-
-const MAX_QTY = [
+const DEFAULT_MAX_QTY = [
   '6',
   '2',
   '4',
@@ -33,6 +33,29 @@ const MAX_QTY = [
   '4',
   '1'
 ];
+
+// Helper to parse env lists (supports comma-separated or JSON array string)
+const parseEnvList = (val: unknown, fallback: string[]): string[] => {
+  if (typeof val !== 'string' || !val.trim()) return fallback;
+  const v = val.trim();
+  try {
+    if (v.startsWith('[')) {
+      const arr = JSON.parse(v);
+      if (Array.isArray(arr)) return arr.map(String);
+    }
+  } catch {
+    // ignore JSON parse errors and fallback to CSV parsing
+  }
+  return v.split(',').map(s => s.trim()).filter(Boolean);
+};
+
+const CATEGORY_NAMES = parseEnvList((import.meta as any)?.env?.VITE_CATEGORY_NAMES, DEFAULT_CATEGORY_NAMES);
+const CATEGORY_PER_QTY_RAW = parseEnvList((import.meta as any)?.env?.VITE_CATEGORY_PER_QTY, DEFAULT_CATEGORY_PER_QTY);
+const MAX_QTY_RAW = parseEnvList((import.meta as any)?.env?.VITE_MAX_QTY, DEFAULT_MAX_QTY);
+
+// Normalize lengths to match CATEGORY_NAMES
+const CATEGORY_PER_QTY = CATEGORY_NAMES.map((_, i) => CATEGORY_PER_QTY_RAW[i] ?? '');
+const MAX_QTY = CATEGORY_NAMES.map((_, i) => MAX_QTY_RAW[i] ?? '0');
 
 // Helpers to parse category label and extract per-qty info (for backward compatibility)
 const parseCategory = (label: string) => {
@@ -48,7 +71,7 @@ type Entry = {
   quantity: number;
 };
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4020';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 function App() {
   // Form state

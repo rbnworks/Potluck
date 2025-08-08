@@ -18,7 +18,7 @@ app.add_middleware(
 )
 
 EXCEL_FILE = "potluck_data.xlsx"
-ADMIN_PASSWORD = "admin123"  # Change this in production!
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")  # Change this in production!
 
 CATEGORIES = [
     "Starters",
