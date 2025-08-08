@@ -3,13 +3,14 @@ import './App.css';
 
 const CATEGORIES = [
   'Starters',
+  'Salads',
   'Veg curry',
   'Non-veg Curry',
   'Chapatis/Naan/Roti (Breads)',
   'Rice Items',
   'Sweets',
+  'Drinks'
 ];
-
 type Entry = {
   name: string;
   category: string;
@@ -459,21 +460,7 @@ function App() {
         width: window.innerWidth < 768 ? '100%' : 'auto',
         maxWidth: window.innerWidth < 768 ? '100%' : '100vw',
         boxSizing: 'border-box'
-      }}>
-        <div style={{ flex: 1, marginBottom: '1rem' }}>
-          <h2 style={{ 
-            color: '#2c3e50', 
-            marginBottom: '1rem', 
-            fontSize: window.innerWidth < 768 ? '1.5rem' : '1.8rem', 
-            fontWeight: '600',
-            textAlign: 'center'
-          }}>📊 Summary</h2>
-          {loading ? (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '2rem',
-              color: '#7f8c8d',
-              fontSize: '16px'
+             fontSize: '16px'
             }}>
               Loading...
             </div>
