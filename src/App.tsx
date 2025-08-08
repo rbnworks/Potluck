@@ -42,6 +42,15 @@ function App() {
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
 
+  // View/UX constraints: no vertical scrolling – use tabs on mobile and pagination for the list
+  const isMobile = window.innerWidth < 768;
+  const [activeTab, setActiveTab] = useState<'form' | 'summary'>(isMobile ? 'form' : 'summary');
+  const [showAdmin, setShowAdmin] = useState(!isMobile);
+  const [page, setPage] = useState(1);
+  const pageSize = isMobile ? 5 : 8;
+  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
+  useEffect(() => { setPage(1); }, [entries]);
+
   // Fetch entries
   const fetchEntries = async () => {
     setLoading(true);
@@ -182,36 +191,72 @@ function App() {
   return (
     <div style={{
       display: 'flex',
-      flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-      minHeight: '100vh',
+      flexDirection: isMobile ? 'column' : 'row',
+      height: '100vh',
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       color: '#333',
       padding: 0,
-      gap: window.innerWidth < 768 ? '0' : '0',
+      gap: isMobile ? '0' : '0',
       width: '100%',
       boxSizing: 'border-box',
       overflowX: 'hidden',
+      overflowY: 'hidden',
       maxWidth: '100%'
     }}>
+      {isMobile && (
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          padding: '8px',
+          background: 'rgba(255,255,255,0.2)'
+        }}>
+          <button
+            onClick={() => setActiveTab('form')}
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              border: 0,
+              borderRadius: 8,
+              color: '#fff',
+              background: activeTab === 'form' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(0,0,0,0.2)',
+              fontWeight: 600
+            }}
+          >Form</button>
+          <button
+            onClick={() => setActiveTab('summary')}
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              border: 0,
+              borderRadius: 8,
+              color: '#fff',
+              background: activeTab === 'summary' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(0,0,0,0.2)',
+              fontWeight: 600
+            }}
+          >Summary</button>
+        </div>
+      )}
       {/* Left: Entry Form & Admin Panel */}
       <div style={{
-        flex: window.innerWidth < 768 ? 'none' : 1,
-        padding: window.innerWidth < 768 ? '0.5rem' : '1.5rem',
+        display: isMobile ? (activeTab === 'form' ? 'block' : 'none') : 'block',
+        flex: isMobile ? 'none' : 1,
+        padding: isMobile ? '0.5rem' : '1.5rem',
         background: '#ffffff',
-        margin: window.innerWidth < 768 ? '0' : '0 0.5rem 0 0',
-        borderRadius: window.innerWidth < 768 ? 0 : 12,
-        boxShadow: window.innerWidth < 768 ? 'none' : '0 8px 32px rgba(0,0,0,0.1)',
-        overflowY: 'auto',
-        minWidth: window.innerWidth < 768 ? '0' : '300px',
-        maxWidth: window.innerWidth < 768 ? '100%' : '500px',
-        width: window.innerWidth < 768 ? '100%' : 'auto',
+        margin: isMobile ? '0' : '0 0.5rem 0 0',
+        borderRadius: isMobile ? 0 : 12,
+        boxShadow: isMobile ? 'none' : '0 8px 32px rgba(0,0,0,0.1)',
+        overflow: 'hidden',
+        minWidth: isMobile ? '0' : '300px',
+        maxWidth: isMobile ? '100%' : '500px',
+        width: isMobile ? '100%' : 'auto',
+        height: '100vh',
         boxSizing: 'border-box'
       }}>
         <h2 style={{ 
           color: '#2c3e50', 
-          marginBottom: '1.5rem', 
-          fontSize: window.innerWidth < 768 ? '1.5rem' : '1.8rem', 
+          marginBottom: '1rem', 
+          fontSize: isMobile ? '1.3rem' : '1.8rem', 
           fontWeight: '600',
           textAlign: 'center'
         }}>🍽️ Add Your Dish</h2>
@@ -312,11 +357,21 @@ function App() {
             {formMsg}
           </div>
         )}
+        {/* Admin toggle on mobile */}
+        {isMobile && (
+          <div style={{ textAlign: 'center', marginTop: 8 }}>
+            <button onClick={() => setShowAdmin(v => !v)} style={{
+              background: 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)',
+              color: '#fff', border: 0, padding: '8px 12px', borderRadius: 8, fontSize: '12px', fontWeight: 600
+            }}>{showAdmin ? 'Hide Admin' : 'Show Admin'}</button>
+          </div>
+        )}
         {/* Admin actions (moved below form) */}
         <div style={{ 
           borderTop: '2px solid #ecf0f1',
-          paddingTop: window.innerWidth < 768 ? '1rem' : '1.5rem',
-          marginTop: window.innerWidth < 768 ? '1rem' : '2rem'
+          paddingTop: isMobile ? '0.8rem' : '1.5rem',
+          marginTop: isMobile ? '0.8rem' : '2rem',
+          display: !isMobile || showAdmin ? 'block' : 'none'
         }}>
           <h3 style={{ 
             color: '#2c3e50', 
@@ -446,21 +501,35 @@ function App() {
       </div>
       {/* Right: Summary & Who brings what */}
       <div style={{
-        flex: window.innerWidth < 768 ? 'none' : 1,
-        display: 'flex',
+        display: isMobile ? (activeTab === 'summary' ? 'flex' : 'none') : 'flex',
+        flex: isMobile ? 'none' : 1,
         flexDirection: 'column',
-        padding: window.innerWidth < 768 ? '0.5rem' : '1.5rem',
-        margin: window.innerWidth < 768 ? '0' : '0 0 0 0.5rem',
+        padding: isMobile ? '0.5rem' : '1.5rem',
+        margin: isMobile ? '0' : '0 0 0 0.5rem',
         background: '#ffffff',
-        borderRadius: window.innerWidth < 768 ? 0 : 12,
-        boxShadow: window.innerWidth < 768 ? 'none' : '0 8px 32px rgba(0,0,0,0.1)',
-        overflowY: 'auto',
-        minHeight: window.innerWidth < 768 ? '300px' : 'auto',
-        minWidth: window.innerWidth < 768 ? '0' : '500px',
-        width: window.innerWidth < 768 ? '100%' : 'auto',
-        maxWidth: window.innerWidth < 768 ? '100%' : '100vw',
+        borderRadius: isMobile ? 0 : 12,
+        boxShadow: isMobile ? 'none' : '0 8px 32px rgba(0,0,0,0.1)',
+        overflow: 'hidden',
+        minWidth: isMobile ? '0' : '500px',
+        width: isMobile ? '100%' : 'auto',
+        maxWidth: isMobile ? '100%' : '100vw',
+        height: '100vh',
         boxSizing: 'border-box'
-             fontSize: '16px'
+      }}>
+        <div style={{ flex: 1, marginBottom: '1rem' }}>
+          <h2 style={{ 
+            color: '#2c3e50', 
+            marginBottom: '1rem', 
+            fontSize: window.innerWidth < 768 ? '1.5rem' : '1.8rem', 
+            fontWeight: '600',
+            textAlign: 'center'
+          }}>📊 Summary</h2>
+          {loading ? (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '2rem',
+              color: '#7f8c8d',
+              fontSize: '16px'
             }}>
               Loading...
             </div>
@@ -523,7 +592,7 @@ function App() {
           )}
         </div>
         {/* Bottom: Who brings what */}
-        <div style={{ flex: 1, marginBottom: window.innerWidth < 768 ? '1rem' : '2rem' }}>
+        <div style={{ flex: 1, marginBottom: isMobile ? '0.5rem' : '2rem' }}>
           <h3 style={{ 
             color: '#2c3e50', 
             marginBottom: '1rem', 
@@ -534,9 +603,9 @@ function App() {
           {entries.length === 0 ? (
             <div style={{ 
               textAlign: 'center', 
-              padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
+              padding: isMobile ? '1.2rem' : '2rem',
               color: '#7f8c8d',
-              fontSize: window.innerWidth < 768 ? '14px' : '16px',
+              fontSize: isMobile ? '14px' : '16px',
               background: '#f8f9fa',
               borderRadius: 12,
               border: '2px dashed #dee2e6'
@@ -545,12 +614,11 @@ function App() {
             </div>
           ) : (
             <div style={{ 
-              maxHeight: window.innerWidth < 768 ? 200 : 280, 
-              overflowY: 'auto',
               background: '#f8f9fa',
               borderRadius: 12,
               boxShadow: '0 4px 15px rgba(0,0,0,0.08)'
             }}>
+              {/* Pagination-aware table (no vertical scroll) */}
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)', position: 'sticky', top: 0 }}>
@@ -586,76 +654,93 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.slice().reverse().map((e, i) => {
-                    const originalIndex = entries.length - 1 - i; // Calculate original index
-                    return (
-                    <tr key={originalIndex} style={{ 
-                      background: i % 2 === 0 ? '#ffffff' : '#f1f3f4',
-                      borderBottom: '1px solid #e9ecef'
-                    }}>
-                      {editIdx === originalIndex ? (
-                        <>
-                          <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
-                            <input value={editEntry?.name || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, name: ev.target.value } : null)} style={{ width: '100%' }} />
-                          </td>
-                          <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', display: window.innerWidth < 480 ? 'none' : 'table-cell' }}>
-                            <select value={editEntry?.category || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, category: ev.target.value } : null)} style={{ width: '100%' }}>
-                              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-                            </select>
-                          </td>
-                          <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
-                            <input value={editEntry?.dish || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, dish: ev.target.value } : null)} style={{ width: '100%' }} />
-                          </td>
-                          <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', textAlign: 'right' }}>
-                            <input type="number" min={1} value={editEntry?.quantity || 1} onChange={ev => setEditEntry(editEntry ? { ...editEntry, quantity: Number(ev.target.value) } : null)} style={{ width: 60 }} />
-                          </td>
-                          {adminMode && (
-                            <td colSpan={2} style={{ padding: 4, textAlign: 'right' }}>
-                              <button onClick={() => handleEditSave(originalIndex)} style={{ marginRight: 8, background: '#27ae60', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Save</button>
-                              <button onClick={handleEditCancel} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Cancel</button>
-                            </td>
+                  {(() => {
+                    const reversed = entries.slice().reverse();
+                    const start = (page - 1) * pageSize;
+                    const pageItems = reversed.slice(start, start + pageSize);
+                    return pageItems.map((e, i) => {
+                      const originalIndex = entries.length - 1 - (start + i);
+                      return (
+                        <tr key={originalIndex} style={{ 
+                          background: (start + i) % 2 === 0 ? '#ffffff' : '#f1f3f4',
+                          borderBottom: '1px solid #e9ecef'
+                        }}>
+                          {editIdx === originalIndex ? (
+                            <>
+                              <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
+                                <input value={editEntry?.name || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, name: ev.target.value } : null)} style={{ width: '100%' }} />
+                              </td>
+                              <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', display: window.innerWidth < 480 ? 'none' : 'table-cell' }}>
+                                <select value={editEntry?.category || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, category: ev.target.value } : null)} style={{ width: '100%' }}>
+                                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                                </select>
+                              </td>
+                              <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
+                                <input value={editEntry?.dish || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, dish: ev.target.value } : null)} style={{ width: '100%' }} />
+                              </td>
+                              <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', textAlign: 'right' }}>
+                                <input type="number" min={1} value={editEntry?.quantity || 1} onChange={ev => setEditEntry(editEntry ? { ...editEntry, quantity: Number(ev.target.value) } : null)} style={{ width: 60 }} />
+                              </td>
+                              {adminMode && (
+                                <td colSpan={2} style={{ padding: 4, textAlign: 'right' }}>
+                                  <button onClick={() => handleEditSave(originalIndex)} style={{ marginRight: 8, background: '#27ae60', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Save</button>
+                                  <button onClick={handleEditCancel} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Cancel</button>
+                                </td>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <td style={{ 
+                                padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                                color: '#2c3e50',
+                                fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                                fontWeight: '500'
+                              }}>{e.name}</td>
+                              <td style={{ 
+                                padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                                color: '#34495e',
+                                fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                                display: window.innerWidth < 480 ? 'none' : 'table-cell'
+                              }}>{e.category}</td>
+                              <td style={{ 
+                                padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                                color: '#2c3e50',
+                                fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                                fontWeight: '500'
+                              }}>{e.dish}</td>
+                              <td style={{ 
+                                padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', 
+                                textAlign: 'right',
+                                color: '#e74c3c',
+                                fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                                fontWeight: '600'
+                              }}>{e.quantity}</td>
+                              {adminMode && (
+                                <td style={{ padding: 4, textAlign: 'right' }}>
+                                  <button onClick={() => handleEditStart(originalIndex)} style={{ marginRight: 8, background: '#2980b9', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Edit</button>
+                                  <button onClick={() => handleDelete(originalIndex)} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Delete</button>
+                                </td>
+                              )}
+                            </>
                           )}
-                        </>
-                      ) : (
-                        <>
-                          <td style={{ 
-                            padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                            color: '#2c3e50',
-                            fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                            fontWeight: '500'
-                          }}>{e.name}</td>
-                          <td style={{ 
-                            padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                            color: '#34495e',
-                            fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                            display: window.innerWidth < 480 ? 'none' : 'table-cell'
-                          }}>{e.category}</td>
-                          <td style={{ 
-                            padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                            color: '#2c3e50',
-                            fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                            fontWeight: '500'
-                          }}>{e.dish}</td>
-                          <td style={{ 
-                            padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', 
-                            textAlign: 'right',
-                            color: '#e74c3c',
-                            fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                            fontWeight: '600'
-                          }}>{e.quantity}</td>
-                          {adminMode && (
-                            <td style={{ padding: 4, textAlign: 'right' }}>
-                              <button onClick={() => handleEditStart(originalIndex)} style={{ marginRight: 8, background: '#2980b9', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Edit</button>
-                              <button onClick={() => handleDelete(originalIndex)} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Delete</button>
-                            </td>
-                          )}
-                        </>
-                      )}
-                    </tr>
-                    );
-                  })}
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
+              {/* Pagination controls */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px' }}>
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{
+                  background: page === 1 ? '#bdc3c7' : 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)',
+                  color: '#fff', border: 0, padding: '6px 12px', borderRadius: 6, cursor: page === 1 ? 'not-allowed' : 'pointer'
+                }}>Prev</button>
+                <span style={{ fontSize: 12, color: '#2c3e50' }}>Page {page} of {totalPages}</span>
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{
+                  background: page === totalPages ? '#bdc3c7' : 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)',
+                  color: '#fff', border: 0, padding: '6px 12px', borderRadius: 6, cursor: page === totalPages ? 'not-allowed' : 'pointer'
+                }}>Next</button>
+              </div>
             </div>
           )}
         </div>
