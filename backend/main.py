@@ -1,5 +1,5 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Body
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import openpyxl
@@ -77,3 +77,38 @@ def download_excel(password: str):
     if password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid password")
     return FileResponse(EXCEL_FILE, filename=EXCEL_FILE)
+
+# Admin edit and delete endpoints
+@app.post("/admin/edit")
+def admin_edit_entry(password: str = Body(...), index: int = Body(...), name: str = Body(...), category: str = Body(...), dish: str = Body(...), quantity: int = Body(...)):
+    if password != ADMIN_PASSWORD:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+    entries = get_entries()
+    if index < 0 or index >= len(entries):
+        return JSONResponse(status_code=400, content={"error": "Invalid index"})
+    entries[index] = Entry(name=name, category=category, dish=dish, quantity=quantity)
+    # Save all entries to Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["Name", "Category", "Dish", "Quantity"])
+    for e in entries:
+        ws.append([e.name, e.category, e.dish, e.quantity])
+    wb.save(EXCEL_FILE)
+    return {"success": True}
+
+@app.post("/admin/delete")
+def admin_delete_entry(password: str = Body(...), index: int = Body(...)):
+    if password != ADMIN_PASSWORD:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+    entries = get_entries()
+    if index < 0 or index >= len(entries):
+        return JSONResponse(status_code=400, content={"error": "Invalid index"})
+    entries.pop(index)
+    # Save all entries to Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["Name", "Category", "Dish", "Quantity"])
+    for e in entries:
+        ws.append([e.name, e.category, e.dish, e.quantity])
+    wb.save(EXCEL_FILE)
+    return {"success": True}

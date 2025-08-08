@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import './App.css';
 
@@ -18,7 +17,7 @@ type Entry = {
   quantity: number;
 };
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4020';
 
 function App() {
   // Form state
@@ -37,6 +36,10 @@ function App() {
   const [adminPw, setAdminPw] = useState('');
   const [adminMsg, setAdminMsg] = useState('');
   const [downloading, setDownloading] = useState(false);
+
+  // Edit entry state
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editEntry, setEditEntry] = useState<Entry | null>(null);
 
   // Fetch entries
   const fetchEntries = async () => {
@@ -120,6 +123,60 @@ function App() {
       setAdminMsg('Network error');
     }
     setDownloading(false);
+  };
+
+  // Delete entry
+  const handleDelete = async (idx: number) => {
+    if (!adminMode) return;
+    const entry = entries[idx];
+    if (!window.confirm(`Delete entry for ${entry.name} (${entry.dish})?`)) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/admin/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPw, index: idx }),
+      });
+      if (res.ok) {
+        fetchEntries();
+      } else {
+        setAdminMsg('Delete failed');
+      }
+    } catch {
+      setAdminMsg('Network error');
+    }
+  };
+
+  // Start editing
+  const handleEditStart = (idx: number) => {
+    setEditIdx(idx);
+    setEditEntry({ ...entries[idx] });
+  };
+
+  // Cancel editing
+  const handleEditCancel = () => {
+    setEditIdx(null);
+    setEditEntry(null);
+  };
+
+  // Save edit
+  const handleEditSave = async (idx: number) => {
+    if (!editEntry) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/admin/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPw, index: idx, ...editEntry }),
+      });
+      if (res.ok) {
+        setEditIdx(null);
+        setEditEntry(null);
+        fetchEntries();
+      } else {
+        setAdminMsg('Edit failed');
+      }
+    } catch {
+      setAdminMsg('Network error');
+    }
   };
   return (
     <div style={{ 
@@ -537,31 +594,64 @@ function App() {
                       background: i % 2 === 0 ? '#ffffff' : '#f1f3f4',
                       borderBottom: '1px solid #e9ecef'
                     }}>
-                      <td style={{ 
-                        padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                        color: '#2c3e50',
-                        fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                        fontWeight: '500'
-                      }}>{e.name}</td>
-                      <td style={{ 
-                        padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                        color: '#34495e',
-                        fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                        display: window.innerWidth < 480 ? 'none' : 'table-cell'
-                      }}>{e.category}</td>
-                      <td style={{ 
-                        padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                        color: '#2c3e50',
-                        fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                        fontWeight: '500'
-                      }}>{e.dish}</td>
-                      <td style={{ 
-                        padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', 
-                        textAlign: 'right',
-                        color: '#e74c3c',
-                        fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                        fontWeight: '600'
-                      }}>{e.quantity}</td>
+                      {editIdx === i ? (
+                        <>
+                          <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
+                            <input value={editEntry?.name || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, name: ev.target.value } : null)} style={{ width: '100%' }} />
+                          </td>
+                          <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', display: window.innerWidth < 480 ? 'none' : 'table-cell' }}>
+                            <select value={editEntry?.category || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, category: ev.target.value } : null)} style={{ width: '100%' }}>
+                              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                            </select>
+                          </td>
+                          <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
+                            <input value={editEntry?.dish || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, dish: ev.target.value } : null)} style={{ width: '100%' }} />
+                          </td>
+                          <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', textAlign: 'right' }}>
+                            <input type="number" min={1} value={editEntry?.quantity || 1} onChange={ev => setEditEntry(editEntry ? { ...editEntry, quantity: Number(ev.target.value) } : null)} style={{ width: 60 }} />
+                          </td>
+                          {adminMode && (
+                            <td colSpan={2} style={{ padding: 4, textAlign: 'right' }}>
+                              <button onClick={() => handleEditSave(i)} style={{ marginRight: 8, background: '#27ae60', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Save</button>
+                              <button onClick={handleEditCancel} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Cancel</button>
+                            </td>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <td style={{ 
+                            padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                            color: '#2c3e50',
+                            fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                            fontWeight: '500'
+                          }}>{e.name}</td>
+                          <td style={{ 
+                            padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                            color: '#34495e',
+                            fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                            display: window.innerWidth < 480 ? 'none' : 'table-cell'
+                          }}>{e.category}</td>
+                          <td style={{ 
+                            padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                            color: '#2c3e50',
+                            fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                            fontWeight: '500'
+                          }}>{e.dish}</td>
+                          <td style={{ 
+                            padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', 
+                            textAlign: 'right',
+                            color: '#e74c3c',
+                            fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                            fontWeight: '600'
+                          }}>{e.quantity}</td>
+                          {adminMode && (
+                            <td style={{ padding: 4, textAlign: 'right' }}>
+                              <button onClick={() => handleEditStart(i)} style={{ marginRight: 8, background: '#2980b9', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Edit</button>
+                              <button onClick={() => handleDelete(i)} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Delete</button>
+                            </td>
+                          )}
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
