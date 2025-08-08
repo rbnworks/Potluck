@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import './App.css';
 
 // Split into two lists: base names and per-qty notes
@@ -129,9 +129,58 @@ function App() {
   const [activeTab, setActiveTab] = useState<'form' | 'summary'>(isMobile ? 'form' : 'summary');
   const [showAdmin, setShowAdmin] = useState(!isMobile);
   const [page, setPage] = useState(1);
-  const pageSize = isMobile ? 5 : 8;
+  const [pageSize, setPageSize] = useState(isMobile ? 5 : 8);
+  const listScrollRef = React.useRef<any>(null);
+  // Mobile Summary tab: measure tabs header height to size scroll container correctly
+  const tabsRef = React.useRef<HTMLDivElement | null>(null);
+  const [mobileTabsH, setMobileTabsH] = useState(0);
+  useLayoutEffect(() => {
+    const measure = () => setMobileTabsH(tabsRef.current?.offsetHeight ?? 0);
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [isMobile, activeTab]);
+  const recalcPageSize = React.useCallback(() => {
+    const measure = () => {
+      // Mobile: full-page scroll; use simple page size rule
+      if (isMobile) {
+        const count = entries.length;
+        const size = count <= 3 ? Math.max(1, count) : 3; // enable pagination only after 3
+        setPageSize(size);
+        return;
+      }
+      // Desktop: dynamic calculation based on available height in scroll area
+      const el = listScrollRef.current as HTMLElement | null;
+      if (!el) return;
+      const thead = el.querySelector('thead') as HTMLElement | null;
+      const headerH = thead ? thead.getBoundingClientRect().height : 40;
+      const rows = Array.from(el.querySelectorAll('tbody tr')) as HTMLElement[];
+      const rowHeights = rows.map(r => r.getBoundingClientRect().height).filter(h => h > 0);
+      const defaultRowH = 44;
+      const rawRowH = Math.max(defaultRowH, ...(rowHeights.length ? rowHeights : [0]));
+      const rowH = Math.ceil(rawRowH);
+      const buffer = 10;
+      const avail = Math.max(0, el.clientHeight - headerH - buffer);
+      const computed = Math.max(3, Math.floor(avail / rowH) || 8);
+      setPageSize(computed);
+    };
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => requestAnimationFrame(measure));
+      setTimeout(measure, 60);
+    } else {
+      measure();
+    }
+  }, [isMobile, entries.length]);
+  useLayoutEffect(() => { recalcPageSize(); }, [entries, activeTab, adminMode, editIdx, recalcPageSize]);
+  useEffect(() => {
+    const onResize = () => recalcPageSize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [recalcPageSize]);
   const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
-  useEffect(() => { setPage(1); }, [entries]);
+  useEffect(() => { setPage(1); }, [entries, pageSize]);
+  const mobilePagerThreshold = 3;
+  const showPager = (!isMobile && totalPages > 1) || (isMobile && entries.length > mobilePagerThreshold && totalPages > 1);
 
   // Fetch entries
   const fetchEntries = async () => {
@@ -287,7 +336,7 @@ function App() {
       maxWidth: '100%'
     }}>
       {isMobile && (
-        <div style={{
+        <div ref={tabsRef} style={{
           display: 'flex',
           gap: 8,
           padding: '8px',
@@ -606,22 +655,25 @@ function App() {
         display: isMobile ? (activeTab === 'summary' ? 'flex' : 'none') : 'flex',
         flex: isMobile ? 'none' : 1,
         flexDirection: 'column',
-        padding: isMobile ? '0.5rem' : '1.5rem',
+        padding: isMobile ? '0.5rem' : '1rem',
         margin: isMobile ? '0' : '0 0 0 0.5rem',
         background: '#ffffff',
         borderRadius: isMobile ? 0 : 12,
         boxShadow: isMobile ? 'none' : '0 8px 32px rgba(0,0,0,0.1)',
-        overflow: 'hidden',
+        overflowX: 'hidden',
+        overflowY: isMobile && activeTab === 'summary' ? 'auto' : 'hidden',
+        WebkitOverflowScrolling: isMobile && activeTab === 'summary' ? 'touch' : undefined,
         minWidth: isMobile ? '0' : '500px',
         width: isMobile ? '100%' : 'auto',
         maxWidth: isMobile ? '100%' : '100vw',
-        height: '100vh',
-        boxSizing: 'border-box'
+        height: isMobile ? (activeTab === 'summary' ? `calc(100vh - ${mobileTabsH}px)` : '100vh') : '100vh',
+        boxSizing: 'border-box',
+        minHeight: 0
       }}>
-        <div style={{ flex: 1, marginBottom: '1rem' }}>
+        <div style={{ flex: '0 0 auto', marginBottom: '1rem', position: 'relative', zIndex: 0 }}>
           <h2 style={{ 
             color: '#2c3e50', 
-            marginBottom: '1rem', 
+            marginBottom: '0.75rem', 
             fontSize: window.innerWidth < 768 ? '1.5rem' : '1.8rem', 
             fontWeight: '600',
             textAlign: 'center'
@@ -629,7 +681,7 @@ function App() {
           {loading ? (
             <div style={{ 
               textAlign: 'center', 
-              padding: '2rem',
+              padding: '1.25rem',
               color: '#7f8c8d',
               fontSize: '16px'
             }}>
@@ -639,63 +691,65 @@ function App() {
             <div style={{ 
               background: '#f8f9fa',
               borderRadius: 12,
-              overflow: 'hidden',
+              overflow: isMobile ? 'visible' : 'hidden',
               boxShadow: '0 4px 15px rgba(0,0,0,0.08)'
             }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                    <th style={{ 
-                      textAlign: 'left', 
-                      padding: window.innerWidth < 768 ? '12px 16px' : '16px 20px',
-                      color: '#ffffff',
-                      fontSize: window.innerWidth < 768 ? '14px' : '16px',
-                      fontWeight: '600',
-                      letterSpacing: '0.5px'
-                    }}>Category</th>
-                    <th style={{ 
-                      textAlign: 'center', 
-                      padding: window.innerWidth < 768 ? '12px 16px' : '16px 20px',
-                      color: '#ffffff',
-                      fontSize: window.innerWidth < 768 ? '14px' : '16px',
-                      fontWeight: '600',
-                      letterSpacing: '0.5px'
-                    }}>Per Qty</th>
-                    <th style={{ 
-                      textAlign: 'right', 
-                      padding: window.innerWidth < 768 ? '12px 16px' : '16px 20px',
-                      color: '#ffffff',
-                      fontSize: window.innerWidth < 768 ? '14px' : '16px',
-                      fontWeight: '600',
-                      letterSpacing: '0.5px'
-                    }}>Total Qty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {CATEGORY_NAMES.map((baseName, i) => {
-                    const items = entries.filter(e => normalizeCategory(e.category) === baseName);
-                    const total = items.reduce((sum, e) => sum + (e.quantity || 0), 0);
-                    return (
-                      <tr key={baseName} style={{ 
-                        background: i % 2 === 0 ? '#ffffff' : '#f1f3f4',
-                        borderBottom: '1px solid #e9ecef'
-                      }}>
-                        <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '500' }}>{baseName}</td>
-                        <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '500', textAlign: 'center' }}>{CATEGORY_PER_QTY[i]}</td>
-                        <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', textAlign: 'right', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '600' }}>{`${total} / ${maxQtyNums[i]}`}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div style={{ overflowY: isMobile ? 'visible' : 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+                      <th style={{ 
+                        textAlign: 'left', 
+                        padding: window.innerWidth < 768 ? '12px 16px' : '16px 20px',
+                        color: '#ffffff',
+                        fontSize: window.innerWidth < 768 ? '14px' : '16px',
+                        fontWeight: '600',
+                        letterSpacing: '0.5px'
+                      }}>Category</th>
+                      <th style={{ 
+                        textAlign: 'center', 
+                        padding: window.innerWidth < 768 ? '12px 16px' : '16px 20px',
+                        color: '#ffffff',
+                        fontSize: window.innerWidth < 768 ? '14px' : '16px',
+                        fontWeight: '600',
+                        letterSpacing: '0.5px'
+                      }}>Per Qty</th>
+                      <th style={{ 
+                        textAlign: 'right', 
+                        padding: window.innerWidth < 768 ? '12px 16px' : '16px 20px',
+                        color: '#ffffff',
+                        fontSize: window.innerWidth < 768 ? '14px' : '16px',
+                        fontWeight: '600',
+                        letterSpacing: '0.5px'
+                      }}>Total Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {CATEGORY_NAMES.map((baseName, i) => {
+                      const items = entries.filter(e => normalizeCategory(e.category) === baseName);
+                      const total = items.reduce((sum, e) => sum + (e.quantity || 0), 0);
+                      return (
+                        <tr key={baseName} style={{ 
+                          background: i % 2 === 0 ? '#ffffff' : '#f1f3f4',
+                          borderBottom: '1px solid #e9ecef'
+                        }}>
+                          <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '500' }}>{baseName}</td>
+                          <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '500', textAlign: 'center' }}>{CATEGORY_PER_QTY[i]}</td>
+                          <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', textAlign: 'right', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '600' }}>{`${total} / ${maxQtyNums[i]}`}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
         {/* Bottom: Who brings what */}
-        <div style={{ flex: 1, marginBottom: isMobile ? '0.5rem' : '2rem' }}>
+        <div style={{ flex: isMobile ? 'none' : 1, display: 'flex', flexDirection: 'column', minHeight: 0, marginBottom: 0, position: 'relative', zIndex: 1 }}>
           <h3 style={{ 
             color: '#2c3e50', 
-            marginBottom: '1rem', 
+            marginBottom: '0.5rem', 
             fontSize: window.innerWidth < 768 ? '1.2rem' : '1.4rem', 
             fontWeight: '600',
             textAlign: 'center'
@@ -703,7 +757,7 @@ function App() {
           {entries.length === 0 ? (
             <div style={{ 
               textAlign: 'center', 
-              padding: isMobile ? '1.2rem' : '2rem',
+              padding: isMobile ? '1rem' : '1.25rem',
               color: '#7f8c8d',
               fontSize: isMobile ? '14px' : '16px',
               background: '#f8f9fa',
@@ -713,128 +767,133 @@ function App() {
               No entries yet. Be the first to add your dish! 🎉
             </div>
           ) : (
-            <div style={{ background: '#f8f9fa', borderRadius: 12, boxShadow: '0 4px 15px rgba(0,0,0,0.08)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)', position: 'sticky', top: 0 }}>
-                    <th style={{ 
-                      padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                      color: '#ffffff',
-                      fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                      fontWeight: '600',
-                      textAlign: 'left'
-                    }}>Name</th>
-                    <th style={{ 
-                      padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                      color: '#ffffff',
-                      fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                      fontWeight: '600',
-                      textAlign: 'left',
-                      display: window.innerWidth < 480 ? 'none' : 'table-cell'
-                    }}>Category</th>
-                    <th style={{ 
-                      padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                      color: '#ffffff',
-                      fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                      fontWeight: '600',
-                      textAlign: 'left'
-                    }}>Dish</th>
-                    <th style={{ 
-                      padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                      color: '#ffffff',
-                      fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                      fontWeight: '600',
-                      textAlign: 'right'
-                    }}>Qty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const reversed = entries.slice().reverse();
-                    const start = (page - 1) * pageSize;
-                    const pageItems = reversed.slice(start, start + pageSize);
-                    return pageItems.map((e, i) => {
-                      const originalIndex = entries.length - 1 - (start + i);
-                      return (
-                        <tr key={originalIndex} style={{ 
-                          background: (start + i) % 2 === 0 ? '#ffffff' : '#f1f3f4',
-                          borderBottom: '1px solid #e9ecef'
-                        }}>
-                          {editIdx === originalIndex ? (
-                            <>
-                              <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
-                                <input value={editEntry?.name || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, name: ev.target.value } : null)} style={{ width: '100%' }} />
-                              </td>
-                              <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', display: window.innerWidth < 480 ? 'none' : 'table-cell' }}>
-                                <select value={editEntry ? normalizeCategory(editEntry.category) : ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, category: ev.target.value } : null)} style={{ width: '100%' }}>
-                                  {CATEGORY_NAMES.map(c => <option key={c}>{c}</option>)}
-                                </select>
-                              </td>
-                              <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
-                                <input value={editEntry?.dish || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, dish: ev.target.value } : null)} style={{ width: '100%' }} />
-                              </td>
-                              <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', textAlign: 'right' }}>
-                                <input type="number" min={1} value={editEntry?.quantity || 1} onChange={ev => setEditEntry(editEntry ? { ...editEntry, quantity: Number(ev.target.value) } : null)} style={{ width: 60 }} />
-                              </td>
-                              {adminMode && (
-                                <td colSpan={2} style={{ padding: 4, textAlign: 'right' }}>
-                                  <button onClick={() => handleEditSave(originalIndex)} style={{ marginRight: 8, background: '#27ae60', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Save</button>
-                                  <button onClick={handleEditCancel} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Cancel</button>
+            <div style={{ background: '#f8f9fa', borderRadius: 12, boxShadow: '0 4px 15px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* Top pagination (outside scroll, always visible) */}
+              {showPager && (
+                <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderBottom: '1px solid #e9ecef', background: '#fff' }}>
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{
+                    background: page === 1 ? '#bdc3c7' : 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)',
+                    color: '#fff', border: 0, padding: '6px 10px', borderRadius: 6, cursor: page === 1 ? 'not-allowed' : 'pointer'
+                  }}>Prev</button>
+                  <span style={{ fontSize: 12, color: '#2c3e50' }}>Page {page} of {totalPages}</span>
+                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{
+                    background: page === totalPages ? '#bdc3c7' : 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)',
+                    color: '#fff', border: 0, padding: '6px 10px', borderRadius: 6, cursor: page === totalPages ? 'not-allowed' : 'pointer'
+                  }}>Next</button>
+                </div>
+              )}
+              <div ref={listScrollRef} style={{ flex: isMobile ? 'none' : 1, overflowY: isMobile ? 'visible' : 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+                    <tr style={{ background: 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)' }}>
+                      <th style={{ 
+                        padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                        color: '#ffffff',
+                        fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                        fontWeight: '600',
+                        textAlign: 'left'
+                      }}>Name</th>
+                      <th style={{ 
+                        padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                        color: '#ffffff',
+                        fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                        fontWeight: '600',
+                        textAlign: 'left',
+                        display: window.innerWidth < 480 ? 'none' : 'table-cell'
+                      }}>Category</th>
+                      <th style={{ 
+                        padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                        color: '#ffffff',
+                        fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                        fontWeight: '600',
+                        textAlign: 'left'
+                      }}>Dish</th>
+                      <th style={{ 
+                        padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                        color: '#ffffff',
+                        fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                        fontWeight: '600',
+                        textAlign: 'right'
+                      }}>Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const reversed = entries.slice().reverse();
+                      const start = (page - 1) * pageSize;
+                      const pageItems = reversed.slice(start, start + pageSize);
+                      return pageItems.map((e, i) => {
+                        const originalIndex = entries.length - 1 - (start + i);
+                        return (
+                          <tr key={originalIndex} style={{ 
+                            background: (start + i) % 2 === 0 ? '#ffffff' : '#f1f3f4',
+                            borderBottom: '1px solid #e9ecef'
+                          }}>
+                            {editIdx === originalIndex ? (
+                              <>
+                                <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
+                                  <input value={editEntry?.name || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, name: ev.target.value } : null)} style={{ width: '100%' }} />
                                 </td>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <td style={{ 
-                                padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                                color: '#2c3e50',
-                                fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                                fontWeight: '500'
-                              }}>{e.name}</td>
-                              <td style={{ 
-                                padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                                color: '#34495e',
-                                fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                                display: window.innerWidth < 480 ? 'none' : 'table-cell'
-                              }}>{normalizeCategory(e.category)}</td>
-                              <td style={{ 
-                                padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
-                                color: '#2c3e50',
-                                fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                                fontWeight: '500'
-                              }}>{e.dish}</td>
-                              <td style={{ 
-                                padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', 
-                                textAlign: 'right',
-                                color: '#e74c3c',
-                                fontSize: window.innerWidth < 768 ? '12px' : '14px',
-                                fontWeight: '600'
-                              }}>{e.quantity}</td>
-                              {adminMode && (
-                                <td style={{ padding: 4, textAlign: 'right' }}>
-                                  <button onClick={() => handleEditStart(originalIndex)} style={{ marginRight: 8, background: '#2980b9', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Edit</button>
-                                  <button onClick={() => handleDelete(originalIndex)} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Delete</button>
+                                <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', display: window.innerWidth < 480 ? 'none' : 'table-cell' }}>
+                                  <select value={editEntry ? normalizeCategory(editEntry.category) : ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, category: ev.target.value } : null)} style={{ width: '100%' }}>
+                                    {CATEGORY_NAMES.map(c => <option key={c}>{c}</option>)}
+                                  </select>
                                 </td>
-                              )}
-                            </>
-                          )}
-                        </tr>
-                      );
-                    });
-                  })()}
-                </tbody>
-              </table>
-              {/* Pagination controls */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px' }}>
-                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{
-                  background: page === 1 ? '#bdc3c7' : 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)',
-                  color: '#fff', border: 0, padding: '6px 12px', borderRadius: 6, cursor: page === 1 ? 'not-allowed' : 'pointer'
-                }}>Prev</button>
-                <span style={{ fontSize: 12, color: '#2c3e50' }}>Page {page} of {totalPages}</span>
-                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{
-                  background: page === totalPages ? '#bdc3c7' : 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)',
-                  color: '#fff', border: 0, padding: '6px 12px', borderRadius: 6, cursor: page === totalPages ? 'not-allowed' : 'pointer'
-                }}>Next</button>
+                                <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
+                                  <input value={editEntry?.dish || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, dish: ev.target.value } : null)} style={{ width: '100%' }} />
+                                </td>
+                                <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', textAlign: 'right' }}>
+                                  <input type="number" min={1} value={editEntry?.quantity || 1} onChange={ev => setEditEntry(editEntry ? { ...editEntry, quantity: Number(ev.target.value) } : null)} style={{ width: 60 }} />
+                                </td>
+                                {adminMode && (
+                                  <td colSpan={2} style={{ padding: 4, textAlign: 'right' }}>
+                                    <button onClick={() => handleEditSave(originalIndex)} style={{ marginRight: 8, background: '#27ae60', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Save</button>
+                                    <button onClick={handleEditCancel} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Cancel</button>
+                                  </td>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <td style={{ 
+                                  padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                                  color: '#2c3e50',
+                                  fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                                  fontWeight: '500'
+                                }}>{e.name}</td>
+                                <td style={{ 
+                                  padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                                  color: '#34495e',
+                                  fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                                  fontWeight: '600',
+                                  display: window.innerWidth < 480 ? 'none' : 'table-cell'
+                                }}>{normalizeCategory(e.category)}</td>
+                                <td style={{ 
+                                  padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
+                                  color: '#2c3e50',
+                                  fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                                  fontWeight: '500'
+                                }}>{e.dish}</td>
+                                <td style={{ 
+                                  padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', 
+                                  textAlign: 'right',
+                                  color: '#e74c3c',
+                                  fontSize: window.innerWidth < 768 ? '12px' : '14px',
+                                  fontWeight: '600'
+                                }}>{e.quantity}</td>
+                                {adminMode && (
+                                  <td style={{ padding: 4, textAlign: 'right' }}>
+                                    <button onClick={() => handleEditStart(originalIndex)} style={{ marginRight: 8, background: '#2980b9', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Edit</button>
+                                    <button onClick={() => handleDelete(originalIndex)} style={{ background: '#e74c3c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Delete</button>
+                                  </td>
+                                )}
+                              </>
+                            )}
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
