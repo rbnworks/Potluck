@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import openpyxl
 import os
+import json
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -20,7 +21,7 @@ app.add_middleware(
 EXCEL_FILE = "potluck_data.xlsx"
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")  # Change this in production!
 
-CATEGORIES = [
+DEFAULT_CATEGORIES = [
     "Starters",
     "Salads",
     "Veg curry",
@@ -28,8 +29,23 @@ CATEGORIES = [
     "Chapatis/Naan/Roti etc",
     "Rice Items",
     "Sweets",
-    "Drinks"
+    "Drinks",
 ]
+
+def _parse_categories_env(val: str | None, fallback: list[str]) -> list[str]:
+    if not val or not val.strip():
+        return fallback
+    v = val.strip()
+    try:
+        if v.startswith("["):
+            arr = json.loads(v)
+            if isinstance(arr, list):
+                return [str(x) for x in arr]
+    except Exception:
+        pass
+    return [s.strip() for s in v.split(",") if s.strip()]
+
+CATEGORIES = _parse_categories_env(os.getenv("CATEGORIES"), DEFAULT_CATEGORIES)
 
 class Entry(BaseModel):
     name: str

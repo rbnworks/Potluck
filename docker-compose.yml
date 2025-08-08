@@ -9,6 +9,7 @@ services:
     restart: always
     environment:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - CATEGORIES=${CATEGORIES:-}
   frontend:
     build: .
     ports:
@@ -19,6 +20,6 @@ services:
     environment:
       - VITE_ALLOWED_HOSTS=${VITE_ALLOWED_HOSTS:-<set-your-hosts-here>}
       - VITE_BACKEND_URL=${VITE_BACKEND_URL:-http://localhost:4020}
-      - VITE_CATEGORY_NAMES=${VITE_CATEGORY_NAMES:- Starters,Salads,Drinks}
-      - VITE_CATEGORY_PER_QTY=${VITE_CATEGORY_PER_QTY:-5,5,4}
-      - VITE_MAX_QTY=${VITE_MAX_QTY:-6,2,4}
+      - VITE_CATEGORY_NAMES=${VITE_CATEGORY_NAMES:-}
+      - VITE_CATEGORY_PER_QTY=${VITE_CATEGORY_PER_QTY:-}
+      - VITE_MAX_QTY=${VITE_MAX_QTY:-}
