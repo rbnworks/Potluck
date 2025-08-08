@@ -1,16 +1,46 @@
 import React, { useEffect, useState } from 'react';
 import './App.css';
 
-const CATEGORIES = [
+// Split into two lists: base names and per-qty notes
+const CATEGORY_NAMES = [
   'Starters',
   'Salads',
   'Veg curry',
   'Non-veg Curry',
-  'Chapatis/Naan/Roti (Breads)',
+  'Chapatis/Naan/Roti etc',
   'Rice Items',
   'Sweets',
   'Drinks'
 ];
+const CATEGORY_PER_QTY = [
+  'Serving 5',
+  'Serving 5',
+  'Serving 4',
+  'Serving 4',
+  'Serving 15',
+  'Serving 4',
+  'Serving 8',
+  'Serving 40'
+];
+
+const MAX_QTY = [
+  '6',
+  '2',
+  '4',
+  '7',
+  '5',
+  '6',
+  '4',
+  '1'
+];
+
+// Helpers to parse category label and extract per-qty info (for backward compatibility)
+const parseCategory = (label: string) => {
+  const m = label.match(/^(.*?)\s*\((.*?)\)\s*$/);
+  return { name: (m ? m[1] : label).trim(), perQty: m ? m[2].trim() : '' };
+};
+const normalizeCategory = (label: string) => parseCategory(label).name;
+
 type Entry = {
   name: string;
   category: string;
@@ -23,7 +53,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4020';
 function App() {
   // Form state
   const [name, setName] = useState('');
-  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [category, setCategory] = useState(CATEGORY_NAMES[0]);
   const [dish, setDish] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [formMsg, setFormMsg] = useState('');
@@ -41,6 +71,35 @@ function App() {
   // Edit entry state
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
+
+  // Capacity control per category based on MAX_QTY
+  const maxQtyNums = CATEGORY_NAMES.map((_, i) => Number(MAX_QTY[i] ?? 0));
+  const totalsByName = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const e of entries) {
+      const n = normalizeCategory(e.category);
+      map[n] = (map[n] || 0) + (e.quantity || 0);
+    }
+    return map;
+  }, [entries]);
+  const availableCategories = React.useMemo(
+    () => CATEGORY_NAMES.filter((name, i) => (totalsByName[name] ?? 0) < maxQtyNums[i]),
+    [totalsByName]
+  );
+  useEffect(() => {
+    if (!availableCategories.includes(category)) {
+      setCategory(availableCategories[0] ?? '');
+    }
+  }, [availableCategories]);
+  const selectedIdx = CATEGORY_NAMES.indexOf(category);
+  const remainingForSelected = selectedIdx >= 0
+    ? Math.max(0, maxQtyNums[selectedIdx] - (totalsByName[normalizeCategory(category)] ?? 0))
+    : 0;
+  useEffect(() => {
+    if (remainingForSelected > 0 && quantity > remainingForSelected) {
+      setQuantity(remainingForSelected);
+    }
+  }, [category, totalsByName]);
 
   // View/UX constraints: no vertical scrolling – use tabs on mobile and pagination for the list
   const isMobile = window.innerWidth < 768;
@@ -289,9 +348,21 @@ function App() {
               backgroundColor: '#fff',
               outline: 'none'
             }}
+            disabled={availableCategories.length === 0}
           >
-            {CATEGORIES.map(c => <option key={c} style={{ color: '#333' }}>{c}</option>)}
+            {availableCategories.map(c => <option key={c} style={{ color: '#333' }}>{c}</option>)}
           </select>
+          {availableCategories.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#e74c3c', background: '#fdeaea', border: '1px solid #e74c3c', borderRadius: 6, padding: '8px 10px' }}>
+              All categories have reached the maximum quantity. Please check back later.
+            </div>
+          ) : (
+            remainingForSelected <= 3 && (
+              <div style={{ fontSize: 12, color: '#8e44ad' }}>
+                {remainingForSelected} qty left for this category
+              </div>
+            )
+          )}
           <input 
             required 
             placeholder="Dish Name" 
@@ -311,9 +382,14 @@ function App() {
             required 
             type="number" 
             min={1} 
+            max={Math.max(1, remainingForSelected)}
             placeholder="Quantity" 
             value={quantity} 
-            onChange={e => setQuantity(Number(e.target.value))}
+            onChange={e => {
+              const val = Number(e.target.value);
+              const clamped = Math.max(1, Math.min(val, Math.max(1, remainingForSelected)));
+              setQuantity(clamped);
+            }}
             style={{
               padding: window.innerWidth < 768 ? '10px 14px' : '12px 16px',
               border: '2px solid #e1e8ed',
@@ -322,6 +398,7 @@ function App() {
               backgroundColor: '#fff',
               outline: 'none'
             }}
+            disabled={remainingForSelected === 0}
           />
           <button 
             type="submit" 
@@ -333,10 +410,12 @@ function App() {
               borderRadius: 8,
               fontSize: window.innerWidth < 768 ? '14px' : '16px',
               fontWeight: '600',
-              cursor: 'pointer',
+              cursor: availableCategories.length === 0 || remainingForSelected === 0 ? 'not-allowed' : 'pointer',
+              opacity: availableCategories.length === 0 || remainingForSelected === 0 ? 0.6 : 1,
               transition: 'transform 0.2s ease',
               boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
             }}
+            disabled={availableCategories.length === 0 || remainingForSelected === 0}
             onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
             onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
           >
@@ -552,6 +631,14 @@ function App() {
                       letterSpacing: '0.5px'
                     }}>Category</th>
                     <th style={{ 
+                      textAlign: 'center', 
+                      padding: window.innerWidth < 768 ? '12px 16px' : '16px 20px',
+                      color: '#ffffff',
+                      fontSize: window.innerWidth < 768 ? '14px' : '16px',
+                      fontWeight: '600',
+                      letterSpacing: '0.5px'
+                    }}>Per Qty</th>
+                    <th style={{ 
                       textAlign: 'right', 
                       padding: window.innerWidth < 768 ? '12px 16px' : '16px 20px',
                       color: '#ffffff',
@@ -562,27 +649,17 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {CATEGORIES.map(cat => {
-                    const items = entries.filter(e => e.category === cat);
+                  {CATEGORY_NAMES.map((baseName, i) => {
+                    const items = entries.filter(e => normalizeCategory(e.category) === baseName);
                     const total = items.reduce((sum, e) => sum + (e.quantity || 0), 0);
                     return (
-                      <tr key={cat} style={{ 
-                        background: CATEGORIES.indexOf(cat) % 2 === 0 ? '#ffffff' : '#f1f3f4',
+                      <tr key={baseName} style={{ 
+                        background: i % 2 === 0 ? '#ffffff' : '#f1f3f4',
                         borderBottom: '1px solid #e9ecef'
                       }}>
-                        <td style={{ 
-                          padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px',
-                          color: '#2c3e50',
-                          fontSize: window.innerWidth < 768 ? '13px' : '15px',
-                          fontWeight: '500'
-                        }}>{cat}</td>
-                        <td style={{ 
-                          padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', 
-                          textAlign: 'right',
-                          color: '#2c3e50',
-                          fontSize: window.innerWidth < 768 ? '13px' : '15px',
-                          fontWeight: '600'
-                        }}>{total}</td>
+                        <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '500' }}>{baseName}</td>
+                        <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '500', textAlign: 'center' }}>{CATEGORY_PER_QTY[i]}</td>
+                        <td style={{ padding: window.innerWidth < 768 ? '10px 16px' : '14px 20px', textAlign: 'right', color: '#2c3e50', fontSize: window.innerWidth < 768 ? '13px' : '15px', fontWeight: '600' }}>{total}</td>
                       </tr>
                     );
                   })}
@@ -613,12 +690,7 @@ function App() {
               No entries yet. Be the first to add your dish! 🎉
             </div>
           ) : (
-            <div style={{ 
-              background: '#f8f9fa',
-              borderRadius: 12,
-              boxShadow: '0 4px 15px rgba(0,0,0,0.08)'
-            }}>
-              {/* Pagination-aware table (no vertical scroll) */}
+            <div style={{ background: '#f8f9fa', borderRadius: 12, boxShadow: '0 4px 15px rgba(0,0,0,0.08)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)', position: 'sticky', top: 0 }}>
@@ -671,8 +743,8 @@ function App() {
                                 <input value={editEntry?.name || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, name: ev.target.value } : null)} style={{ width: '100%' }} />
                               </td>
                               <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px', display: window.innerWidth < 480 ? 'none' : 'table-cell' }}>
-                                <select value={editEntry?.category || ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, category: ev.target.value } : null)} style={{ width: '100%' }}>
-                                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                                <select value={editEntry ? normalizeCategory(editEntry.category) : ''} onChange={ev => setEditEntry(editEntry ? { ...editEntry, category: ev.target.value } : null)} style={{ width: '100%' }}>
+                                  {CATEGORY_NAMES.map(c => <option key={c}>{c}</option>)}
                                 </select>
                               </td>
                               <td style={{ padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px' }}>
@@ -701,7 +773,7 @@ function App() {
                                 color: '#34495e',
                                 fontSize: window.innerWidth < 768 ? '12px' : '14px',
                                 display: window.innerWidth < 480 ? 'none' : 'table-cell'
-                              }}>{e.category}</td>
+                              }}>{normalizeCategory(e.category)}</td>
                               <td style={{ 
                                 padding: window.innerWidth < 768 ? '8px 12px' : '12px 16px',
                                 color: '#2c3e50',

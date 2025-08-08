@@ -22,11 +22,13 @@ ADMIN_PASSWORD = "admin123"  # Change this in production!
 
 CATEGORIES = [
     "Starters",
+    "Salads",
     "Veg curry",
     "Non-veg Curry",
-    "Chapatis/Naan/Roti (Breads)",
+    "Chapatis/Naan/Roti etc",
     "Rice Items",
-    "Sweets"
+    "Sweets",
+    "Drinks"
 ]
 
 class Entry(BaseModel):
